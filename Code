@@ -1,0 +1,124 @@
+# 1 Libraries
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+%matplotlib inline
+import seaborn as sns
+import sklearn
+import xgboost as xgb
+import datetime
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score, KFold
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import r2_score
+
+# 2 Loading Data
+
+CovidData = pd.read_csv("country_vaccinations_by_manufacturer.csv")
+type(CovidData)
+CovidData.head()   #CovidData.tail()
+CovidData.shape
+
+# 3 EDA
+
+# 3-1 Cleaning Data
+CovidData['location'] = CovidData['location'].replace([' ',','],'',regex=True)    # modifying , and spaces in dataframe
+CovidData['date'] = CovidData['date'].replace([' ',','],'',regex=True)    # modifying , and spaces in dataframe
+CovidData['vaccine'] = CovidData['vaccine'].replace([' ',','],'',regex=True)    # modifying , and spaces in dataframe
+CovidData['total_vaccinations'] = CovidData['total_vaccinations'].replace([' ',','],'',regex=True)    # modifying , and spaces in dataframe
+
+CovidData.shape
+CovidData.columns
+CovidData.info() #CovidData.dtypes
+df= pd.DataFrame(CovidData)
+df.head()
+
+df['year'] = df.date.str.extract('(\d\d\d\d)',expand=False).astype(int)
+df['date'] = df.date.str.replace('(\d\d\d\d)', '')
+df['month'] = df.date.str.extract('(\d\d)',expand=False).astype(int)
+df['date'] = df.date.str.replace('(-\d\d-)', '')
+df['day'] = df.date.str.extract('(\d\d)',expand=False).astype(int)
+df['date'] = df.date.str.replace('(\d\d)', '')
+
+df.nunique()
+print (df["vaccine"].unique() )
+
+# 4 PreProcessing
+
+df.drop("date", axis=1, inplace = True)
+df.head()
+
+vaccine = pd.get_dummies(df["vaccine"])
+#print (vaccine)
+#df.head()
+Df = pd.concat([df,vaccine],axis=1)
+#print (Df)
+
+location = pd.get_dummies(Df["location"])
+#print (location)
+#df.head()
+Dff = pd.concat([Df,location],axis=1)
+#print (Dff)
+
+Dff.drop("location", axis=1, inplace = True)
+Dff.drop("vaccine", axis=1, inplace = True)
+
+# 5 Storey Telling (Visualization)
+
+Dff.plot(kind='scatter',x='month',y='total_vaccinations',color='red')
+plt.show()
+
+sns.displot(Dff, x="month") 
+
+corr = Dff.corr()
+plt.figure(figsize=(24,20)) 
+sns.heatmap(corr, cmap='viridis', annot=True)
+
+# 6 Preparing Data For Machine Learning
+
+X = Dff.drop(['total_vaccinations'], axis=1)
+y = Dff['total_vaccinations']
+# print(X.head())
+#print(X.shape)
+# print(y.head())
+#print(y.shape)
+
+# 6-1 Splitting
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# 7 Training Model
+reg_mod = xgb.XGBRegressor(
+    n_estimators=1000,
+    learning_rate=0.08,
+    subsample=0.75,
+    colsample_bytree=1, 
+    max_depth=7,
+    gamma=0,
+)
+reg_mod.fit(X_train, y_train)
+
+# 8 Test the model and show the metrics
+
+#After training the model, we'll check the model training score.
+scores = cross_val_score(reg_mod, X_train, y_train,cv=10)
+print("Mean cross-validation score: %.2f" % scores.mean())
+
+reg_mod.fit(X_train,y_train)
+predictions = reg_mod.predict(X_test)
+
+rmse = np.sqrt(mean_squared_error(y_test, predictions))
+print("RMSE: %f" % (rmse))
+
+from sklearn.metrics import r2_score
+r2 = np.sqrt(r2_score(y_test, predictions))
+print("R_Squared Score : %f" % (r2))
+
+plt.figure(figsize=(10, 5), dpi=80)
+sns.lineplot(x='month', y='total_vaccinations', data=Dff)
+
+
+
+
